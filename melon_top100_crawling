@@ -1,0 +1,48 @@
+import requests
+import pandas as pd
+from bs4 import BeautifulSoup
+
+url = "https://www.melon.com/chart/index.htm"
+headers = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/131.0.0.0 Safari/537.36"
+    )
+}
+
+response = requests.get(url, headers=headers, timeout=20)
+response.raise_for_status()
+
+soup = BeautifulSoup(response.text, "html.parser")
+rows = soup.select("tr.lst50, tr.lst100")
+
+if len(rows) != 100:
+    raise RuntimeError(f"멜론 차트에서 {len(rows)}개의 곡을 찾았습니다.")
+
+chart_data = []
+for row in rows:
+    rank = row.select_one("span.rank")
+    song = row.select_one("div.rank01 a")
+    artist = row.select_one("div.rank02 a")
+    album = row.select_one("div.rank03 a")
+
+    if not all((rank, song, artist, album)):
+        continue
+
+    chart_data.append(
+        {
+            "순위": int(rank.get_text(strip=True)),
+            "곡명": song.get_text(strip=True),
+            "가수": artist.get_text(strip=True),
+            "앨범": album.get_text(strip=True),
+        }
+    )
+
+df = pd.DataFrame(chart_data)
+output_file = "melon_top100.csv"
+df.to_csv(output_file, index=False, encoding="utf-8-sig")
+
+display(df.head())
+print(f"수집 건수: {len(df)}")
+print(f"저장 파일: {output_file}")
